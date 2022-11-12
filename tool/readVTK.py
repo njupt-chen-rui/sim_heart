@@ -2,9 +2,7 @@ import numpy as np
 import vtk
 
 
-def read_vtk():
-    filename = "../data/heart1/heart_origin_bou_tag.vtk"
-
+def read_vtk(filename="../data/heart1/heart_origin_bou_tag.vtk"):
     reader = vtk.vtkGenericDataObjectReader()
     reader.SetFileName(filename)
     reader.Update()
@@ -14,5 +12,9 @@ def read_vtk():
     bou_tag = np.array(reader.GetOutput().GetPointData().GetArray("bou_tag"))
     mesh = np.array([cells[i * 5 + 1: i * 5 + 5] for i in range(int(cells.shape[0] / 5))])
 
-    # print(points)
+    # print(len(mesh[0]))
+    # print(mesh.shape)
     return points, mesh, bou_tag
+
+
+# read_vtk()
