@@ -65,8 +65,8 @@ def solve():
     for i in range(1, max_tet_set + 1):
         solveFEM(i)
 
-    for i in range(1, max_edge_set + 1):
-        solveEdge(i)
+    # for i in range(1, max_edge_set + 1):
+    #     solveEdge(i)
 
     for i in range(1, max_tet_set + 1):
         solveVolume(i)
@@ -266,6 +266,9 @@ def ComputePsiDeriv(i: ti.int32):
         aniso_dpsi_vec[i][j] = tmp_vec[j]
 
     Psi[i] = aniso_psi[i] + iso_psi[i]
+    if i == 1:
+        print("aniso:", aniso_psi[i])
+        print("iso:", iso_psi[i])
     # dpsi_vec[i] = iso_dpsi_vec[i] + dFactdF[i].transpose() @ aniso_dpsi_vec[i]
     # tmp_vec = ti.Vector([0., 0., 0., 0., 0., 0., 0., 0., 0.])
     # for j in ti.static(range(9)):
@@ -376,8 +379,8 @@ def updateAct():
         actval[i] = contraction[left] + (contraction[right] - contraction[left]) * (tmp - left) / (right - left)
         actval[i] *= 0.3
 
-        if i == 1:
-            print(actval[i])
+        # if i == 1:
+        #     print(actval[i])
 
 
 @ti.kernel
@@ -402,7 +405,7 @@ def init():
         pos[i] += tm.vec3(0.5, 0.5, 0)
 
     # 杨氏模量和泊松比
-    YoungsModulus[None] = 10000
+    YoungsModulus[None] = 1000
     PoissonsRatio[None] = 0.49
 
     # 初始化Ds

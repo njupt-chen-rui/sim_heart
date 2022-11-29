@@ -2,11 +2,6 @@ from mesh_data import heartMesh
 import taichi as ti
 import numpy as np
 import taichi.math as tm
-import sys
-sys.path.append("../tool")
-import readVTK
-
-readVTK.read_vtk()
 
 ti.init(arch=ti.gpu)
 # ti.init()
