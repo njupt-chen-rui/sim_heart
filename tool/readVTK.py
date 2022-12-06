@@ -15,6 +15,3 @@ def read_vtk(filename="../data/heart1/heart_origin_bou_tag.vtk"):
     # print(len(mesh[0]))
     # print(mesh.shape)
     return points, mesh, bou_tag
-
-
-# read_vtk()

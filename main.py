@@ -10,5 +10,6 @@ if __name__ == "__main__":
     body = Body(vertex, tet)
     Youngs_Modulus = 1000.
     Poisson_Ratio = 0.49
-    material = NeoHookean(Youngs_modulus=Youngs_Modulus, Poisson_ratio=Poisson_Ratio)
+    material = Stable_Neo_Hookean(Youngs_modulus=Youngs_Modulus, Poisson_ratio=Poisson_Ratio)
 
+    body.show()

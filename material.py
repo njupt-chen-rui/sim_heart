@@ -1,5 +1,6 @@
 import numpy as np
 import taichi as ti
+import taichi.math as tm
 
 
 @ti.data_oriented
@@ -50,3 +51,123 @@ class NeoHookean:
         J = F.determinant()
         B = F @ F.transpose()
         return self.C1 * (B.trace() - 3. - 2. * ti.log(J)) + self.D1 * (J - 1.)**2
+
+
+@ti.data_oriented
+class Stable_Neo_Hookean:
+    """
+    elastic energy density:
+    I1 = tr(S), I2 = tr(F^T@F), I3 = det(F)
+    ψ = μ/2 * (I2-3) - μ(I3-1) + λ/2 * (I3-1)^2
+    """
+    def __init__(self, Youngs_modulus, Poisson_ratio):
+        self.Youngs_modulus = Youngs_modulus
+        self.Poisson_ratio = Poisson_ratio
+        self.LameLa = Youngs_modulus * Poisson_ratio / ((1 + Poisson_ratio) * (1 - 2 * Poisson_ratio))
+        self.LameMu = Youngs_modulus / (2 * (1 + Poisson_ratio))
+
+    @ti.func
+    def ComputePsiDeriv(self, deformation_gradient: ti.template()):
+        """
+        input deformationGradient F,
+        return Energy density Psi and the first Piola-Kirchhoff tensor P
+        """
+        mu, la = ti.static(self.LameMu, self.LameLa)
+
+        F = deformation_gradient
+        J = F.determinant()
+
+        # 修改反转元素
+        U, sigma, V = ti.svd(F, ti.f32)
+        if sigma[2, 2] < 0:
+            sigma[2, 2] = -sigma[2, 2]
+
+        # 定义不变量: I1 = tr(S), I2 = tr(F^T@F), I3 = det(F)
+        I1 = sigma[0, 0] + sigma[1, 1] + sigma[2, 2]
+        I2 = sigma[0, 0] * sigma[0, 0] + sigma[1, 1] * sigma[1, 1] + sigma[2, 2] * sigma[2, 2]
+        I3 = sigma[0, 0] * sigma[1, 1] * sigma[2, 2]
+
+        # 定义不变量对于F的导数
+        R = U @ V.transpose()
+        col0 = tm.vec3(F[1, 1] * F[2, 2] - F[1, 2] * F[2, 1],
+                        F[1, 2] * F[2, 0] - F[1, 0] * F[2, 2],
+                        F[1, 0] * F[2, 1] - F[1, 1] * F[2, 0])
+        col1 = tm.vec3(F[2, 1] * F[0, 2] - F[2, 2] * F[0, 1],
+                        F[2, 2] * F[0, 0] - F[2, 0] * F[0, 2],
+                        F[2, 0] * F[0, 1] - F[2, 1] * F[0, 0])
+        col2 = tm.vec3(F[0, 1] * F[1, 2] - F[0, 2] * F[1, 1],
+                        F[0, 2] * F[1, 0] - F[0, 0] * F[1, 2],
+                        F[0, 0] * F[1, 1] - F[0, 1] * F[1, 0])
+        dI1dF = R
+        dI2dF = 2 * F
+        dI3dF = tm.mat3([col0, col1, col2])
+
+        # 定义能量密度
+        # ψ = μ / 2 * (I2 - 3) - μ(I3 - 1) + λ / 2 * (I3 - 1) ^ 2
+        Psi = mu / 2. * (I2 - 3.) - mu * (I3 - 1.) + la / 2. * (I3 - 1.) * (I3 - 1.)
+
+        # 定义1st Piola-Kirchhoff tensor
+        # P = μ / 2 * dI2dF - μ * dI3dF + λ * (I3 - 1) * dI3dF
+        P = mu / 2. * dI2dF - mu * dI3dF + la * (I3 - 1.) * dI3dF
+
+        return Psi, P
+
+
+@ti.data_oriented
+class Stable_Neo_Hookean_with_active:
+    """
+    elastic energy density:
+    I1 = tr(S), I2 = tr(F^T@F), I3 = det(F)
+    ψ = μ/2 * (I2-3) - μ(I3-1) + λ/2 * (I3-1)^2
+    """
+    def __init__(self, Youngs_modulus, Poisson_ratio):
+        self.Youngs_modulus = Youngs_modulus
+        self.Poisson_ratio = Poisson_ratio
+        self.LameLa = Youngs_modulus * Poisson_ratio / ((1 + Poisson_ratio) * (1 - 2 * Poisson_ratio))
+        self.LameMu = Youngs_modulus / (2 * (1 + Poisson_ratio))
+
+    @ti.func
+    def compute_P_Psi(self, deformation_gradient: ti.template()):
+        """
+        input deformationGradient F,
+        return Energy density Psi and the first Piola-Kirchhoff tensor P
+        """
+        mu, la = ti.static(self.LameMu, self.LameLa)
+
+        F = deformation_gradient
+        J = F.determinant()
+
+        # 修改反转元素
+        U, sigma, V = ti.svd(F, ti.f32)
+        if sigma[2, 2] < 0:
+            sigma[2, 2] = -sigma[2, 2]
+
+        # 定义不变量: I1 = tr(S), I2 = tr(F^T@F), I3 = det(F)
+        I1 = sigma[0, 0] + sigma[1, 1] + sigma[2, 2]
+        I2 = sigma[0, 0] * sigma[0, 0] + sigma[1, 1] * sigma[1, 1] + sigma[2, 2] * sigma[2, 2]
+        I3 = sigma[0, 0] * sigma[1, 1] * sigma[2, 2]
+
+        # 定义不变量对于F的导数
+        R = U @ V.transpose()
+        col0 = tm.vec3(F[1, 1] * F[2, 2] - F[1, 2] * F[2, 1],
+                        F[1, 2] * F[2, 0] - F[1, 0] * F[2, 2],
+                        F[1, 0] * F[2, 1] - F[1, 1] * F[2, 0])
+        col1 = tm.vec3(F[2, 1] * F[0, 2] - F[2, 2] * F[0, 1],
+                        F[2, 2] * F[0, 0] - F[2, 0] * F[0, 2],
+                        F[2, 0] * F[0, 1] - F[2, 1] * F[0, 0])
+        col2 = tm.vec3(F[0, 1] * F[1, 2] - F[0, 2] * F[1, 1],
+                        F[0, 2] * F[1, 0] - F[0, 0] * F[1, 2],
+                        F[0, 0] * F[1, 1] - F[0, 1] * F[1, 0])
+        dI1dF = R
+        dI2dF = 2 * F
+        dI3dF = tm.mat3([col0, col1, col2])
+
+        # 定义能量密度
+        # ψ = μ / 2 * (I2 - 3) - μ(I3 - 1) + λ / 2 * (I3 - 1) ^ 2
+        Psi = mu / 2. * (I2 - 3.) - mu * (I3 - 1.) + la / 2. * (I3 - 1.) * (I3 - 1.)
+
+        # 定义1st Piola-Kirchhoff tensor
+        # P = μ / 2 * dI2dF - μ * dI3dF + λ * (I3 - 1) * dI3dF
+        P = mu / 2. * dI2dF - mu * dI3dF + la * (I3 - 1.) * dI3dF
+
+        return Psi, P

@@ -26,7 +26,8 @@ class Body:
         self.surfaces = ti.field(ti.i32, shape=(surfaces.shape[0] * surfaces.shape[1]))
         self.surfaces.from_numpy(surfaces.reshape(-1))
         self.Dm = ti.Matrix.field(3, 3, ti.f32, shape=(self.num_tet,))
-        self.DmInv = ti.Matrix.field(3, 3, ti.f32, shape=(self.num_tet, ))
+        self.DmInv = ti.Matrix.field(3, 3, ti.f32, shape=(self.num_tet,))
+        self.DmInvT = ti.Matrix.field(3, 3, ti.f32, shape=(self.num_tet,))
         self.init_DmInv()
 
     @ti.kernel
@@ -44,6 +45,7 @@ class Body:
 
         for i in range(self.num_tet):
             self.DmInv[i] = self.Dm[i].inverse()
+            self.DmInvT[i] = self.DmInv[i].transpose()
 
     def show(self):
         windowLength = 1024
@@ -96,4 +98,3 @@ if __name__ == "__main__":
     body = Body(vertex=points, elements=mesh)
 
     body.show()
-
