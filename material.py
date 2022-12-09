@@ -67,7 +67,7 @@ class Stable_Neo_Hookean:
         self.LameMu = Youngs_modulus / (2 * (1 + Poisson_ratio))
 
     @ti.func
-    def ComputePsiDeriv(self, deformation_gradient: ti.template()):
+    def ComputePsiDeriv(self, deformation_gradient: ti.template(), fiber_direction: ti.template()):
         """
         input deformationGradient F,
         return Energy density Psi and the first Piola-Kirchhoff tensor P
@@ -120,14 +120,15 @@ class Stable_Neo_Hookean_with_active:
     I1 = tr(S), I2 = tr(F^T@F), I3 = det(F)
     ψ = μ/2 * (I2-3) - μ(I3-1) + λ/2 * (I3-1)^2
     """
-    def __init__(self, Youngs_modulus, Poisson_ratio):
+    def __init__(self, Youngs_modulus, Poisson_ratio, active_tension):
         self.Youngs_modulus = Youngs_modulus
         self.Poisson_ratio = Poisson_ratio
         self.LameLa = Youngs_modulus * Poisson_ratio / ((1 + Poisson_ratio) * (1 - 2 * Poisson_ratio))
         self.LameMu = Youngs_modulus / (2 * (1 + Poisson_ratio))
+        self.Ta = active_tension
 
     @ti.func
-    def compute_P_Psi(self, deformation_gradient: ti.template()):
+    def ComputePsiDeriv(self, deformation_gradient: ti.template(), fiber_direction: ti.template()):
         """
         input deformationGradient F,
         return Energy density Psi and the first Piola-Kirchhoff tensor P
@@ -135,7 +136,8 @@ class Stable_Neo_Hookean_with_active:
         mu, la = ti.static(self.LameMu, self.LameLa)
 
         F = deformation_gradient
-        J = F.determinant()
+        f0 = fiber_direction
+        # J = F.determinant()
 
         # 修改反转元素
         U, sigma, V = ti.svd(F, ti.f32)
@@ -167,7 +169,34 @@ class Stable_Neo_Hookean_with_active:
         Psi = mu / 2. * (I2 - 3.) - mu * (I3 - 1.) + la / 2. * (I3 - 1.) * (I3 - 1.)
 
         # 定义1st Piola-Kirchhoff tensor
-        # P = μ / 2 * dI2dF - μ * dI3dF + λ * (I3 - 1) * dI3dF
-        P = mu / 2. * dI2dF - mu * dI3dF + la * (I3 - 1.) * dI3dF
+        # P_pass = μ / 2 * dI2dF - μ * dI3dF + λ * (I3 - 1) * dI3dF
+        P_pass = mu / 2. * dI2dF - mu * dI3dF + la * (I3 - 1.) * dI3dF
+        # P_act = Ta * (F@f0)@(f0^T) / sqrt(I4f)
+        f = (F @ f0)
+        I4f = f[0] * f[0] + f[1] * f[1] + f[2] * f[2]
+        P_act = self.Ta * (F @ f0) @ (f0.transpose()) / tm.sqrt(I4f)
+        P = P_pass + P_act
 
         return Psi, P
+
+
+@ti.kernel
+def debug(material: ti.template()):
+    F = tm.mat3([1, 0, 0,
+                 0, 1, 0,
+                 0, 0, 1])
+    f0 = tm.vec3([1, 0, 0])
+    Psi, P = material.ComputePsiDeriv(F, f0)
+    print(Psi, P)
+
+
+if __name__ == "__main__":
+    ti.init(arch=ti.cuda)
+    Youngs_Modulus = 1000.
+    Poisson_Ratio = 0.49
+    # material = Stable_Neo_Hookean(Youngs_modulus=Youngs_Modulus, Poisson_ratio=Poisson_Ratio)
+    material = Stable_Neo_Hookean_with_active(Youngs_modulus=Youngs_Modulus, Poisson_ratio=Poisson_Ratio,
+                                              active_tension=60)
+    debug(material)
+
+

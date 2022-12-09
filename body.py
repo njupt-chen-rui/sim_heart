@@ -5,11 +5,12 @@ import taichi as ti
 import numpy as np
 import readVTK
 import geometrytool as geo
+import taichi.math as tm
 
 
 @ti.data_oriented
 class Body:
-    def __init__(self, vertex: np.ndarray, elements: np.ndarray) -> None:
+    def __init__(self, vertex: np.ndarray, elements: np.ndarray, vert_fiber: np.ndarray) -> None:
         # len(vertex[0]) = 3, len(vertex) = num_vert
         self.num_vertex = len(vertex)
         self.vertex = ti.Vector.field(3, dtype=ti.f32, shape=(self.num_vertex, ))
@@ -30,6 +31,14 @@ class Body:
         self.DmInvT = ti.Matrix.field(3, 3, ti.f32, shape=(self.num_tet,))
         self.init_DmInv()
 
+        # 顶点fiber方向
+        self.vert_fiber = ti.Vector.field(3, float, shape=(self.num_vertex,))
+        self.vert_fiber.from_numpy(vert_fiber)
+        # 四面体fiber方向
+        self.tet_fiber = ti.Vector.field(3, float, shape=(self.num_tet,))
+        # 从顶点采样到四面体
+        self.sample_tet_fiber()
+
     @ti.kernel
     def init_DmInv(self):
         for i in range(self.num_tet):
@@ -46,6 +55,14 @@ class Body:
         for i in range(self.num_tet):
             self.DmInv[i] = self.Dm[i].inverse()
             self.DmInvT[i] = self.DmInv[i].transpose()
+
+    @ti.kernel
+    def sample_tet_fiber(self):
+        for i in range(self.num_tet):
+            self.tet_fiber[i] = self.vert_fiber[self.elements[i][0]] + self.vert_fiber[self.elements[i][1]] + \
+                                self.vert_fiber[self.elements[i][2]] + self.vert_fiber[self.elements[i][3]]
+            self.tet_fiber[i] /= 4.0
+            self.tet_fiber[i] /= tm.length(self.tet_fiber[i])
 
     def show(self):
         windowLength = 1024

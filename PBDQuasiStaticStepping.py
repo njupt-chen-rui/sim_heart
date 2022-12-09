@@ -140,8 +140,8 @@ class PBD_with_Continuous_Materials:
         """
         辛欧拉时间积分，计算外力的影响，以及和地面的碰撞
         """
-        g = tm.vec3(0, -9.8, 0)
-        # g = tm.vec3(0, 0, 0)
+        # g = tm.vec3(0, -9.8, 0)
+        g = tm.vec3(0, 0, 0)
         for i in self.vertex:
             self.prevPos[i] = self.vertex[i]
             self.vel[i] += g * self.dt
@@ -169,7 +169,7 @@ class PBD_with_Continuous_Materials:
             if self.tet_set[i] == tet_set_id:
                 self.get_Ds(i)
                 self.F[i] = self.Ds[i] @ self.body.DmInv[i]
-                self.Psi[i], self.P[i] = self.material.ComputePsiDeriv(self.F[i])
+                self.Psi[i], self.P[i] = self.material.ComputePsiDeriv(self.F[i], self.body.tet_fiber[i])
                 self.E[i] = self.restVol[i] * self.Psi[i]
                 dEdx012 = self.restVol[i] * self.P[i] @ self.body.DmInvT[i]
                 dEdx0 = tm.vec3([dEdx012[0, 0], dEdx012[1, 0], dEdx012[2, 0]])
