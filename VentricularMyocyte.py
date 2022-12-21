@@ -7,12 +7,10 @@ import taichi.math as tm
 import time
 
 
-
-
 @ti.data_oriented
 class TP:
-    def __init__(self, cell_type, num_tet) -> None:
-        self.num_cell = num_tet
+    def __init__(self, cell_type, num_cells) -> None:
+        self.num_cell = num_cells
         self.cell_type = cell_type
         self.knak = 2.724
         self.KmNa = 40.0
@@ -150,7 +148,7 @@ class TP:
     @ti.func
     def Step(self, i):
         # 输入
-        Istim = 0.
+        Istim = 0. - tm.clamp(tm.sqrt(i), 0., 52.)
         HT = 0.01
 
         inverseVcF2 = 1 / (2 * self.Vc * self.F)
@@ -342,14 +340,18 @@ class TP:
         for i in range(self.num_cell):
             self.Step(i)
 
+    def debug(self):
+        for i in range(self.num_cell):
+            print(self.Var_Cai[i])
+
 
 if __name__ == "__main__":
-    ti.init(arch=ti.cuda, dynamic_index=True)
+    ti.init(arch=ti.cuda, dynamic_index=True, default_fp=ti.f64)  #
     cell_type = "MCELL"
-    tp = TP(cell_type=cell_type, num_tet=800*800)
+    tp = TP(cell_type=cell_type, num_cells=800*100)
     start = time.time()
-    for _ in range(800*50*5):
+    for _ in range(800*5*50):
         tp.sim()
     end = time.time()
     print(end-start)
-
+    # tp.debug()
